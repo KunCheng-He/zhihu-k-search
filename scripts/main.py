@@ -7,8 +7,12 @@ from zhihu_utils.api_handler import APIHandler
 from zhihu_utils.data_models import SearchType
 
 
-def parse_url(url: str) -> dict:
-    result = {"type": None, "id": None, "question_id": None}
+def parse_url(url: str) -> dict[str, str | int | None]:
+    result: dict[str, str | int | None] = {
+        "type": None,
+        "id": None,
+        "question_id": None,
+    }
 
     question_answer = re.search(r"zhihu\.com/question/(\d+)/answer/(\d+)", url)
     if question_answer:
@@ -84,7 +88,12 @@ async def detail_command(url: str, answer_limit: int, output: str | None):
             return
 
         if parsed["type"] == "answer":
-            answer = await handler.get_answer(parsed["id"], parsed.get("question_id"))
+            answer_id = parsed["id"]
+            question_id = parsed["question_id"]
+            if answer_id is None or question_id is None:
+                print("无法解析回答ID")
+                return
+            answer = await handler.get_answer(int(answer_id), int(question_id))
             if not answer:
                 print("获取回答失败")
                 return
@@ -94,17 +103,29 @@ async def detail_command(url: str, answer_limit: int, output: str | None):
             print(f"赞同: {answer.vote_count}  评论: {answer.comment_count}")
             print(f"链接: {answer.url}")
             print("\n" + "=" * 50 + "\n")
-            content = strip_html(answer.content)
+            content = html_to_markdown(answer.content)
             print(content[:2000] + "..." if len(content) > 2000 else content)
 
             if output:
+                md_content = f"# {answer.question_title}\n\n"
+                md_content += f"**作者**: {answer.author_name}\n"
+                md_content += (
+                    f"**赞同**: {answer.vote_count}  **评论**: {answer.comment_count}\n"
+                )
+                md_content += f"**链接**: {answer.url}\n\n"
+                md_content += "---\n\n"
+                md_content += html_to_markdown(answer.content)
                 with open(output, "w", encoding="utf-8") as f:
-                    json.dump(answer.model_dump(), f, ensure_ascii=False, indent=2)
+                    f.write(md_content)
                 print(f"\n结果已保存至: {output}")
 
         elif parsed["type"] == "question":
+            question_id = parsed["id"]
+            if question_id is None:
+                print("无法解析问题ID")
+                return
             data = await handler.get_question_with_answers(
-                parsed["id"], answer_limit=answer_limit
+                int(question_id), answer_limit=answer_limit
             )
             if not data:
                 print("获取问题失败")
@@ -117,31 +138,41 @@ async def detail_command(url: str, answer_limit: int, output: str | None):
             print(f"回答数: {question.answer_count}  关注数: {question.follower_count}")
             print(f"链接: {question.url}")
             if question.detail:
-                print(f"\n问题详情:\n{strip_html(question.detail)[:500]}")
+                print(f"\n问题详情:\n{html_to_markdown(question.detail)[:500]}")
 
             print(f"\n共 {len(answers)} 个回答:\n")
             for i, ans in enumerate(answers, 1):
                 print(f"[{i}] {ans.author_name}")
                 print(f"    赞同: {ans.vote_count}  评论: {ans.comment_count}")
-                excerpt = strip_html(ans.excerpt or ans.content)[:200]
+                excerpt = html_to_markdown(ans.excerpt or ans.content)[:200]
                 print(f"    {excerpt}...")
                 print()
 
             if output:
-                with open(output, "w", encoding="utf-8") as f:
-                    json.dump(
-                        {
-                            "question": question.model_dump(),
-                            "answers": [a.model_dump() for a in answers],
-                        },
-                        f,
-                        ensure_ascii=False,
-                        indent=2,
+                md_content = f"# {question.title}\n\n"
+                md_content += f"**回答数**: {question.answer_count}  **关注数**: {question.follower_count}\n"
+                md_content += f"**链接**: {question.url}\n\n"
+                if question.detail:
+                    md_content += "## 问题详情\n\n"
+                    md_content += html_to_markdown(question.detail) + "\n\n"
+                md_content += f"## 回答 (共 {len(answers)} 个)\n\n"
+                for i, ans in enumerate(answers, 1):
+                    md_content += f"### 回答 {i}: {ans.author_name}\n\n"
+                    md_content += (
+                        f"**赞同**: {ans.vote_count}  **评论**: {ans.comment_count}\n\n"
                     )
+                    md_content += html_to_markdown(ans.content) + "\n\n"
+                    md_content += "---\n\n"
+                with open(output, "w", encoding="utf-8") as f:
+                    f.write(md_content)
                 print(f"结果已保存至: {output}")
 
         elif parsed["type"] == "article":
-            article = await handler.get_article(parsed["id"])
+            article_id = parsed["id"]
+            if article_id is None:
+                print("无法解析文章ID")
+                return
+            article = await handler.get_article(article_id)
             if not article:
                 print("获取文章失败")
                 return
@@ -151,21 +182,46 @@ async def detail_command(url: str, answer_limit: int, output: str | None):
             print(f"赞同: {article.vote_count}  评论: {article.comment_count}")
             print(f"链接: {article.url}")
             print("\n" + "=" * 50 + "\n")
-            content = strip_html(article.content)
+            content = html_to_markdown(article.content)
             print(content[:2000] + "..." if len(content) > 2000 else content)
 
             if output:
+                md_content = f"# {article.title}\n\n"
+                md_content += f"**作者**: {article.author_name}\n"
+                md_content += f"**赞同**: {article.vote_count}  **评论**: {article.comment_count}\n"
+                md_content += f"**链接**: {article.url}\n\n"
+                md_content += "---\n\n"
+                md_content += html_to_markdown(article.content)
                 with open(output, "w", encoding="utf-8") as f:
-                    json.dump(article.model_dump(), f, ensure_ascii=False, indent=2)
+                    f.write(md_content)
                 print(f"\n结果已保存至: {output}")
 
     finally:
         await browser.close()
 
 
-def strip_html(text: str) -> str:
+def html_to_markdown(text: str) -> str:
+    img_pattern = r'<img[^>]+src=["\']([^"\']+)["\'][^>]*alt=["\']([^"\']*)["\'][^>]*>'
+    text = re.sub(img_pattern, r"![\2](\1)", text)
+    img_pattern_no_alt = r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>'
+    text = re.sub(img_pattern_no_alt, r"![](\1)", text)
     text = re.sub(r"<br\s*/?>", "\n", text)
     text = re.sub(r"</p>", "\n", text)
+    text = re.sub(r"<strong[^>]*>([^<]+)</strong>", r"**\1**", text)
+    text = re.sub(r"<b[^>]*>([^<]+)</b>", r"**\1**", text)
+    text = re.sub(r"<em[^>]*>([^<]+)</em>", r"*\1*", text)
+    text = re.sub(r"<i[^>]*>([^<]+)</i>", r"*\1*", text)
+    text = re.sub(r"<code[^>]*>([^<]+)</code>", r"`\1`", text)
+    text = re.sub(r"<pre[^>]*>([^<]+)</pre>", r"```\n\1\n```", text)
+    text = re.sub(
+        r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', r"[\2](\1)", text
+    )
+    text = re.sub(r"<li[^>]*>", "- ", text)
+    text = re.sub(r"</li>", "", text)
+    text = re.sub(r"<h[1-6][^>]*>", "\n## ", text)
+    text = re.sub(r"</h[1-6]>", "\n", text)
+    text = re.sub(r"<blockquote[^>]*>", "\n> ", text)
+    text = re.sub(r"</blockquote>", "\n", text)
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
@@ -195,7 +251,7 @@ async def main():
     detail_parser.add_argument(
         "--answer-limit", "-a", type=int, default=5, help="获取回答数量 (仅问题)"
     )
-    detail_parser.add_argument("--output", "-o", help="输出文件路径 (JSON)")
+    detail_parser.add_argument("--output", "-o", help="输出文件路径 (Markdown)")
 
     args = parser.parse_args()
 
