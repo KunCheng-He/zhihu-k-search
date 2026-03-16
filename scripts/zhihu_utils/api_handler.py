@@ -193,14 +193,28 @@ class APIHandler:
         )
 
     async def get_question(self, question_id: int) -> Question | None:
-        url = f"https://www.zhihu.com/api/v4/questions/{question_id}"
+        url = f"https://www.zhihu.com/question/{question_id}"
         self.clear_captured()
 
         await self.page.goto(url, wait_until="networkidle")
 
-        if self.captured_responses:
-            data = self.captured_responses[0]["data"]
-            return self._parse_question(data)
+        for resp in self.captured_responses:
+            data = resp.get("data", {})
+            if isinstance(data, dict) and "title" in data and "answer_count" in data:
+                return self._parse_question(data)
+
+        from zhihu_utils.extractors import extract_question_detail
+
+        detail = await extract_question_detail(self.page)
+        if detail.get("title"):
+            return Question(
+                id=question_id,
+                title=detail.get("title", ""),
+                detail=detail.get("detail", ""),
+                answer_count=detail.get("answer_count", 0),
+                follower_count=0,
+                url=f"https://www.zhihu.com/question/{question_id}",
+            )
 
         return None
 
@@ -221,16 +235,54 @@ class APIHandler:
         limit: int = 20,
         sort_by: str = "default",
     ) -> list[Answer]:
-        url = f"https://www.zhihu.com/api/v4/questions/{question_id}/answers?offset={offset}&limit={limit}&sort_by={sort_by}"
+        url = f"https://www.zhihu.com/question/{question_id}"
         self.clear_captured()
 
         await self.page.goto(url, wait_until="networkidle")
 
-        if self.captured_responses:
-            data = self.captured_responses[0]["data"]
-            return self._parse_answers(data.get("data", []))
+        from zhihu_utils.extractors import extract_all_answers
 
-        return []
+        answers_data = await extract_all_answers(self.page)
+
+        answers: list[Answer] = []
+        for i, ans_data in enumerate(answers_data[:limit]):
+            answers.append(
+                Answer(
+                    id=0,
+                    question_id=question_id,
+                    question_title="",
+                    content=ans_data.get("content", ""),
+                    excerpt="",
+                    author_name=ans_data.get("author", ""),
+                    author_url_token="",
+                    vote_count=ans_data.get("vote_count", 0),
+                    comment_count=ans_data.get("comment_count", 0),
+                    url=f"https://www.zhihu.com/question/{question_id}",
+                )
+            )
+
+        for resp in self.captured_responses:
+            data = resp.get("data", {})
+            items = (
+                data
+                if isinstance(data, list)
+                else [data]
+                if isinstance(data, dict)
+                else []
+            )
+            for item in items:
+                if item.get("type") == "answer" and item.get("id"):
+                    for ans in answers:
+                        if not ans.id:
+                            ans.id = item.get("id", 0)
+                            question = item.get("question", {})
+                            ans.question_title = question.get("title", "")
+                            author = item.get("author", {})
+                            if not ans.author_name:
+                                ans.author_name = author.get("name", "")
+                            break
+
+        return answers
 
     def _parse_answers(self, items: list[dict[str, Any]]) -> list[Answer]:
         answers: list[Answer] = []
@@ -259,3 +311,137 @@ class APIHandler:
             comment_count=data.get("comment_count", 0) or 0,
             url=f"https://www.zhihu.com/question/{question.get('id', 0)}/answer/{data.get('id', 0)}",
         )
+
+    async def get_answer(
+        self, answer_id: int, question_id: int | None = None
+    ) -> Answer | None:
+        if not question_id:
+            return None
+
+        url = f"https://www.zhihu.com/question/{question_id}/answer/{answer_id}"
+        self.clear_captured()
+
+        await self.page.goto(url, wait_until="networkidle")
+
+        from zhihu_utils.extractors import extract_answer_by_id
+
+        answer_data = await extract_answer_by_id(self.page, answer_id)
+        if not answer_data:
+            return None
+
+        for resp in self.captured_responses:
+            data = resp.get("data", {})
+            items = (
+                data
+                if isinstance(data, list)
+                else [data]
+                if isinstance(data, dict)
+                else []
+            )
+            for item in items:
+                if item.get("id") == answer_id:
+                    question = item.get("question", {})
+                    author = item.get("author", {})
+                    return Answer(
+                        id=item.get("id", 0),
+                        question_id=question.get("id", question_id),
+                        question_title=question.get("title", ""),
+                        content=answer_data.get("content", ""),
+                        excerpt=item.get("excerpt", ""),
+                        author_name=author.get("name", answer_data.get("author", "")),
+                        author_url_token=author.get("url_token", ""),
+                        vote_count=item.get("voteup_count", 0)
+                        or answer_data.get("vote_count", 0),
+                        comment_count=item.get("comment_count", 0)
+                        or answer_data.get("comment_count", 0),
+                        url=f"https://www.zhihu.com/question/{question_id}/answer/{answer_id}",
+                    )
+
+        return Answer(
+            id=answer_id,
+            question_id=question_id,
+            question_title="",
+            content=answer_data.get("content", ""),
+            excerpt="",
+            author_name=answer_data.get("author", ""),
+            author_url_token="",
+            vote_count=answer_data.get("vote_count", 0),
+            comment_count=answer_data.get("comment_count", 0),
+            url=f"https://www.zhihu.com/question/{question_id}/answer/{answer_id}",
+        )
+
+    async def get_article(self, article_id: str | int) -> Article | None:
+        url = f"https://zhuanlan.zhihu.com/p/{article_id}"
+        self.clear_captured()
+
+        await self.page.goto(url, wait_until="networkidle")
+
+        from zhihu_utils.extractors import extract_article_content
+
+        article_data = await extract_article_content(self.page)
+        if not article_data:
+            return None
+
+        for resp in self.captured_responses:
+            data = resp.get("data", {})
+            if isinstance(data, dict) and data.get("id"):
+                author = data.get("author", {})
+                return Article(
+                    id=str(data.get("id", article_id)),
+                    title=data.get("title", article_data.get("title", "")),
+                    content=article_data.get("content", ""),
+                    excerpt=data.get("excerpt", ""),
+                    author_name=author.get("name", article_data.get("author", "")),
+                    author_url_token=author.get("url_token", ""),
+                    vote_count=data.get("voteup_count", 0)
+                    or article_data.get("vote_count", 0),
+                    comment_count=data.get("comment_count", 0)
+                    or article_data.get("comment_count", 0),
+                    url=f"https://zhuanlan.zhihu.com/p/{article_id}",
+                )
+
+        return Article(
+            id=str(article_id),
+            title=article_data.get("title", ""),
+            content=article_data.get("content", ""),
+            excerpt="",
+            author_name=article_data.get("author", ""),
+            author_url_token="",
+            vote_count=article_data.get("vote_count", 0),
+            comment_count=article_data.get("comment_count", 0),
+            url=f"https://zhuanlan.zhihu.com/p/{article_id}",
+        )
+
+    def _parse_article(self, data: dict[str, Any]) -> Article:
+        author = data.get("author", {})
+
+        return Article(
+            id=str(data.get("id", "")),
+            title=data.get("title", ""),
+            content=data.get("content", ""),
+            excerpt=data.get("excerpt", ""),
+            author_name=author.get("name", ""),
+            author_url_token=author.get("url_token", ""),
+            vote_count=data.get("voteup_count", 0) or 0,
+            comment_count=data.get("comment_count", 0) or 0,
+            url=f"https://zhuanlan.zhihu.com/p/{data.get('id', '')}",
+        )
+
+    async def get_question_with_answers(
+        self,
+        question_id: int,
+        answer_limit: int = 5,
+        sort_by: str = "default",
+    ) -> dict[str, Any] | None:
+        question = await self.get_question(question_id)
+        if not question:
+            return None
+
+        answers = await self.get_answers(
+            question_id, limit=answer_limit, sort_by=sort_by
+        )
+
+        return {
+            "question": question,
+            "answers": answers,
+        }

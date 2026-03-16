@@ -105,10 +105,10 @@ def _parse_comment_count(text: str) -> int:
 
 
 async def extract_question_detail(page: Page) -> dict:
-    title_el = page.locator("h1.QuestionHeader-title")
+    title_el = page.locator("h1.QuestionHeader-title").first
     title = await title_el.inner_text() if await title_el.count() > 0 else ""
 
-    detail_el = page.locator(".QuestionRichText, .QuestionHeader-detail")
+    detail_el = page.locator(".QuestionRichText, .QuestionHeader-detail").first
     detail = await detail_el.inner_text() if await detail_el.count() > 0 else ""
 
     answer_count_el = page.locator(".List-headerText")
@@ -125,6 +125,133 @@ async def extract_question_detail(page: Page) -> dict:
         "title": title.strip(),
         "detail": detail.strip(),
         "answer_count": answer_count,
+    }
+
+
+async def extract_answer_by_id(page: Page, answer_id: int | str) -> dict | None:
+    answer_el = page.locator(
+        f'[data-za-index][data-zop-feedwr="{answer_id}"], [data-id="{answer_id}"]'
+    )
+    if await answer_el.count() > 0:
+        return await _extract_answer_content(answer_el.first)
+
+    items = await page.locator(".List-item").all()
+    for item in items:
+        data_id = await item.get_attribute("data-id") or await item.get_attribute(
+            "data-zop-feedwr"
+        )
+        if data_id and str(data_id) == str(answer_id):
+            return await _extract_answer_content(item)
+
+    content_el = page.locator(".RichContent-inner")
+    if await content_el.count() > 0:
+        return await _extract_answer_from_page(page)
+
+    return None
+
+
+async def _extract_answer_from_page(page: Page) -> dict:
+    author_el = page.locator(".AuthorInfo-name").first
+    author = await author_el.inner_text() if await author_el.count() > 0 else ""
+
+    content_el = page.locator(".RichContent-inner").first
+    content = ""
+    if await content_el.count() > 0:
+        content = await content_el.inner_html()
+
+    vote_el = page.locator(".VoteButton--up").first
+    vote_count = 0
+    if await vote_el.count() > 0:
+        vote_text = await vote_el.inner_text()
+        vote_count = _parse_vote_count(vote_text)
+
+    comment_el = page.locator('button:has-text("评论")').first
+    comment_count = 0
+    if await comment_el.count() > 0:
+        comment_text = await comment_el.inner_text()
+        comment_count = _parse_comment_count(comment_text)
+
+    return {
+        "author": author.strip(),
+        "content": content,
+        "vote_count": vote_count,
+        "comment_count": comment_count,
+    }
+
+
+async def _extract_answer_content(item) -> dict:
+    author_el = item.locator(".AuthorInfo-name")
+    author = await author_el.inner_text() if await author_el.count() > 0 else ""
+
+    content_el = item.locator(".RichContent-inner")
+    content = ""
+    if await content_el.count() > 0:
+        content = await content_el.inner_html()
+
+    vote_el = item.locator(".VoteButton--up")
+    vote_count = 0
+    if await vote_el.count() > 0:
+        vote_text = await vote_el.inner_text()
+        vote_count = _parse_vote_count(vote_text)
+
+    comment_el = item.locator('button:has-text("评论")')
+    comment_count = 0
+    if await comment_el.count() > 0:
+        comment_text = await comment_el.first.inner_text()
+        comment_count = _parse_comment_count(comment_text)
+
+    return {
+        "author": author.strip(),
+        "content": content,
+        "vote_count": vote_count,
+        "comment_count": comment_count,
+    }
+
+
+async def extract_all_answers(page: Page) -> list[dict]:
+    answers: list[dict] = []
+
+    await page.wait_for_selector(".List-item", timeout=10000)
+    items = await page.locator(".List-item").all()
+
+    for item in items:
+        answer = await _extract_answer_content(item)
+        if answer and answer.get("content"):
+            answers.append(answer)
+
+    return answers
+
+
+async def extract_article_content(page: Page) -> dict:
+    title_el = page.locator("h1.Post-Title, .Post-Title").first
+    title = await title_el.inner_text() if await title_el.count() > 0 else ""
+
+    author_el = page.locator(".AuthorInfo-name").first
+    author = await author_el.inner_text() if await author_el.count() > 0 else ""
+
+    content_el = page.locator(".Post-RichText").first
+    content = ""
+    if await content_el.count() > 0:
+        content = await content_el.inner_html()
+
+    vote_el = page.locator(".VoteButton--up").first
+    vote_count = 0
+    if await vote_el.count() > 0:
+        vote_text = await vote_el.inner_text()
+        vote_count = _parse_vote_count(vote_text)
+
+    comment_el = page.locator('button:has-text("评论")').first
+    comment_count = 0
+    if await comment_el.count() > 0:
+        comment_text = await comment_el.inner_text()
+        comment_count = _parse_comment_count(comment_text)
+
+    return {
+        "title": title.strip(),
+        "author": author.strip(),
+        "content": content,
+        "vote_count": vote_count,
+        "comment_count": comment_count,
     }
 
 
