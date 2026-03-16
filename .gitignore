@@ -162,3 +162,13 @@ cython_debug/
 
 # MacOS
 .DS_Store
+
+# 认证信息
+auth.json
+
+# 浏览器数据目录
+browser_data/
+
+# 调试文件
+debug.png
+*.png
