@@ -4,7 +4,9 @@
 
 ## 项目概述
 
-本项目是一个知乎搜索脚本，通过浏览器自动化技术（Playwright）模拟用户行为，获取搜索结果、问题内容及回答数据。项目后续将封装为 SKILL 供 Agent 使用。
+本项目是一个知乎搜索脚本，通过浏览器自动化技术（Playwright）模拟用户行为，获取搜索结果、问题内容及回答数据。项目已封装为 OpenCode Skill (`zhihu-k-research`)，可供 AI Agent 直接调用。
+
+**项目状态：已完成开发，可投入使用。**
 
 **技术栈**：
 - Python 3.14+
@@ -24,20 +26,26 @@
 
 ```text
 zhihu-k-search/
-├── scripts/                    # 主要代码目录（所有代码在此）
-│   ├── pyproject.toml          # 项目依赖配置
-│   ├── .python-version         # Python 版本声明
-│   ├── main.py                 # 脚本入口
-│   ├── login_helper.py         # 登录及身份校验逻辑
-│   ├── tests/                  # 测试目录
-│   │   └── test_*.py           # 测试文件
-│   └── zhihu_utils/            # 核心业务逻辑模块
-│       ├── __init__.py
-│       ├── browser.py          # Playwright 启动与反爬配置
-│       ├── api_handler.py      # API 请求处理
-│       ├── data_models.py      # Pydantic 数据模型
-│       └── extractors.py       # DOM 提取器
-└── PLAN.md                     # 技术方案文档
+├── SKILL.md                 # Skill 定义文件
+├── README.md                # 项目说明文档
+├── AGENTS.md                # 本文件 - AI Agent 开发指南
+├── PLAN.md                  # 技术方案文档
+└── scripts/                 # 主要代码目录（所有代码在此）
+    ├── pyproject.toml       # 项目依赖配置
+    ├── .python-version      # Python 版本声明
+    ├── main.py              # CLI 入口
+    ├── commands.py          # 命令实现
+    ├── login_helper.py      # 登录及身份校验逻辑
+    ├── tests/               # 测试目录
+    │   └── test_*.py        # 测试文件
+    └── zhihu_utils/         # 核心业务逻辑模块
+        ├── __init__.py
+        ├── browser.py       # Playwright 启动与反爬配置
+        ├── api_handler.py   # API 请求处理
+        ├── data_models.py   # Pydantic 数据模型
+        ├── extractors.py    # DOM 提取器
+        ├── url_parser.py    # URL 解析器
+        └── formatters.py    # 输出格式化
 ```
 
 ## 构建与运行命令
@@ -294,3 +302,12 @@ python_files = ["test_*.py"]
 2. **反爬策略**：使用 `playwright-stealth` 隐藏自动化特征
 3. **API 优先**：优先拦截 API 响应获取数据，DOM 提取作为备用方案
 4. **无头模式**：生产环境使用 headless 模式，调试时可使用有头模式
+
+## Skill 使用
+
+项目已封装为 OpenCode Skill，详细使用说明请参考 `SKILL.md`。
+
+**快速使用**：
+1. 将本项目目录添加到 OpenCode 的 skills 配置
+2. Skill 名称：`zhihu-k-research`
+3. 触发关键词：知乎、zhihu、知乎搜索、知乎问题等

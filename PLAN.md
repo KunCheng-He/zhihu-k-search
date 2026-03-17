@@ -1,6 +1,8 @@
 # 知乎搜索脚本技术方案 (zhihu-k-search)
 
-本项目旨在实现一个知乎搜索脚本，通过浏览器自动化技术模拟用户行为，获取搜索结果、问题内容及回答数据。该脚本后续将封装为 SKILL 供 Agent 使用。
+本项目实现了一个知乎搜索脚本，通过浏览器自动化技术模拟用户行为，获取搜索结果、问题内容及回答数据。项目已封装为 OpenCode Skill (`zhihu-k-research`)，可供 AI Agent 直接调用。
+
+**项目状态：已完成开发，可投入使用。**
 
 ## 1. 技术栈选型
 
@@ -33,18 +35,64 @@
 ## 3. 项目目录结构
 
 ```text
-zhihu-k-search/scripts/
-├── .python-version      # Python 版本声明 (3.14+)
-├── pyproject.toml       # 项目依赖配置 (uv 管理)
-├── auth.json            # 【身份认证信息】存储登录状态（本地存储，gitignore）
-├── main.py              # 脚本入口，分发搜索与抓取任务
-├── login_helper.py      # 专门负责处理首次登录及身份校验逻辑
-├── zhihu_utils/         # 核心业务逻辑模块
-│   ├── __init__.py
-│   ├── browser.py       # 封装 Playwright 启动与反爬配置
-│   ├── api_handler.py   # 拦截并处理 Zhihu API 请求 (GraphQL/REST)
-│   ├── data_models.py   # 定义数据解析结构 (Pydantic Models)
-│   └── extractors.py    # DOM 提取器（备用方案）
-└── tests/               # 测试目录
-    └── test_search.py
+zhihu-k-search/
+├── SKILL.md              # Skill 定义文件（OpenCode Skill 配置）
+├── README.md             # 项目说明文档
+├── AGENTS.md             # AI Agent 开发指南
+├── PLAN.md               # 技术方案文档（本文件）
+└── scripts/              # 核心代码目录
+    ├── .python-version   # Python 版本声明 (3.14+)
+    ├── pyproject.toml    # 项目依赖配置 (uv 管理)
+    ├── auth.json         # 身份认证信息（本地存储，gitignore）
+    ├── main.py           # CLI 入口，分发搜索与抓取任务
+    ├── commands.py       # 命令实现模块
+    ├── login_helper.py   # 登录及身份校验逻辑
+    ├── zhihu_utils/      # 核心业务逻辑模块
+    │   ├── __init__.py
+    │   ├── browser.py       # Playwright 启动与反爬配置
+    │   ├── api_handler.py   # API 请求处理
+    │   ├── data_models.py   # Pydantic 数据模型
+    │   ├── extractors.py    # DOM 提取器（备用方案）
+    │   ├── url_parser.py    # URL 解析器
+    │   └── formatters.py    # 输出格式化
+    └── tests/               # 测试目录
+        └── test_*.py
 ```
+
+## 4. 已实现功能
+
+### 4.1 CLI 命令
+
+| 命令 | 功能 | 示例 |
+|------|------|------|
+| `login` | 交互式登录 | `uv run python main.py login` |
+| `login --check` | 检查登录状态 | `uv run python main.py login --check` |
+| `search` | 搜索知乎内容 | `uv run python main.py search "关键词" -l 10` |
+| `detail` | 获取详情 | `uv run python main.py detail "https://..."` |
+
+### 4.2 数据模型
+
+- **SearchResult**: 搜索结果
+- **Question**: 问题详情
+- **Answer**: 回答内容
+- **Article**: 文章内容
+- **SearchResponse**: 搜索响应（含分页信息）
+
+### 4.3 输出格式
+
+- 搜索结果：终端输出 + 可选 JSON 文件
+- 详情内容：终端输出 + 可选 Markdown 文件
+
+## 5. Skill 集成
+
+项目已封装为 OpenCode Skill，配置文件为 `SKILL.md`。
+
+**Skill 名称**: `zhihu-k-research`
+
+**触发场景**:
+- 搜索知乎关键词
+- 获取问题详情和回答
+- 获取文章内容
+- 产品调研或竞品分析
+
+**使用方式**: 将本项目目录添加到 OpenCode 的 skills 配置中即可自动识别。
