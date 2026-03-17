@@ -1,8 +1,24 @@
+"""
+DOM 提取器模块。
+
+当 API 拦截失败时，通过解析页面 DOM 结构提取数据。
+作为数据获取的备用方案。
+"""
+
 from playwright.async_api import Page
 from zhihu_utils.data_models import SearchResult
 
 
 async def extract_search_results(page: Page) -> list[SearchResult]:
+    """
+    从搜索结果页面提取搜索结果列表。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        SearchResult 对象列表。
+    """
     results: list[SearchResult] = []
 
     await page.wait_for_selector(".SearchResult-Card, .List-item", timeout=10000)
@@ -18,6 +34,15 @@ async def extract_search_results(page: Page) -> list[SearchResult]:
 
 
 async def _extract_search_card(card) -> SearchResult | None:
+    """
+    从单个搜索卡片元素提取数据。
+
+    Args:
+        card: 卡片元素定位器。
+
+    Returns:
+        SearchResult 对象或 None。
+    """
     try:
         title_el = card.locator("h2 a, .ContentItem-title a")
         if await title_el.count() == 0:
@@ -77,6 +102,15 @@ async def _extract_search_card(card) -> SearchResult | None:
 
 
 def _parse_vote_count(text: str) -> int:
+    """
+    解析赞同数文本（支持万、k 等单位）。
+
+    Args:
+        text: 赞同数文本，如 "1.2 万"、"5k"。
+
+    Returns:
+        数值。
+    """
     text = text.strip()
     if not text:
         return 0
@@ -96,6 +130,15 @@ def _parse_vote_count(text: str) -> int:
 
 
 def _parse_comment_count(text: str) -> int:
+    """
+    解析评论数文本。
+
+    Args:
+        text: 评论数文本，如 "12 条评论"。
+
+    Returns:
+        数值。
+    """
     import re
 
     match = re.search(r"(\d+)", text)
@@ -105,6 +148,15 @@ def _parse_comment_count(text: str) -> int:
 
 
 async def extract_question_detail(page: Page) -> dict:
+    """
+    从问题页面提取问题详情。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        包含 title、detail、answer_count 的字典。
+    """
     title_el = page.locator("h1.QuestionHeader-title").first
     title = await title_el.inner_text() if await title_el.count() > 0 else ""
 
@@ -129,6 +181,16 @@ async def extract_question_detail(page: Page) -> dict:
 
 
 async def extract_answer_by_id(page: Page, answer_id: int | str) -> dict | None:
+    """
+    根据 ID 提取特定回答。
+
+    Args:
+        page: Playwright 页面对象。
+        answer_id: 回答 ID。
+
+    Returns:
+        包含回答信息的字典或 None。
+    """
     answer_el = page.locator(
         f'[data-za-index][data-zop-feedwr="{answer_id}"], [data-id="{answer_id}"]'
     )
@@ -151,6 +213,15 @@ async def extract_answer_by_id(page: Page, answer_id: int | str) -> dict | None:
 
 
 async def _extract_answer_from_page(page: Page) -> dict:
+    """
+    从回答详情页面提取回答内容。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        包含回答信息的字典。
+    """
     author_el = page.locator(".AuthorInfo-name").first
     author = await author_el.inner_text() if await author_el.count() > 0 else ""
 
@@ -180,6 +251,15 @@ async def _extract_answer_from_page(page: Page) -> dict:
 
 
 async def _extract_answer_content(item) -> dict:
+    """
+    从回答元素提取内容。
+
+    Args:
+        item: 回答元素定位器。
+
+    Returns:
+        包含回答信息的字典。
+    """
     author_el = item.locator(".AuthorInfo-name")
     author = await author_el.inner_text() if await author_el.count() > 0 else ""
 
@@ -209,6 +289,15 @@ async def _extract_answer_content(item) -> dict:
 
 
 async def extract_all_answers(page: Page) -> list[dict]:
+    """
+    提取问题页面所有回答。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        回答信息字典列表。
+    """
     answers: list[dict] = []
 
     await page.wait_for_selector(".List-item", timeout=10000)
@@ -223,6 +312,15 @@ async def extract_all_answers(page: Page) -> list[dict]:
 
 
 async def extract_article_content(page: Page) -> dict:
+    """
+    从文章页面提取文章内容。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        包含文章信息的字典。
+    """
     title_el = page.locator("h1.Post-Title, .Post-Title").first
     title = await title_el.inner_text() if await title_el.count() > 0 else ""
 
@@ -256,6 +354,15 @@ async def extract_article_content(page: Page) -> dict:
 
 
 async def extract_answers(page: Page) -> list[dict]:
+    """
+    提取回答列表（简化版，仅返回文本内容）。
+
+    Args:
+        page: Playwright 页面对象。
+
+    Returns:
+        回答信息字典列表。
+    """
     answers: list[dict] = []
 
     await page.wait_for_selector(".List-item", timeout=10000)
@@ -270,6 +377,15 @@ async def extract_answers(page: Page) -> list[dict]:
 
 
 async def _extract_answer_item(item) -> dict | None:
+    """
+    从回答元素提取简化信息。
+
+    Args:
+        item: 回答元素定位器。
+
+    Returns:
+        包含回答信息的字典或 None。
+    """
     try:
         author_el = item.locator(".AuthorInfo-name")
         author = await author_el.inner_text() if await author_el.count() > 0 else ""

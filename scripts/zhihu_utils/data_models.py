@@ -1,9 +1,18 @@
+"""
+数据模型定义模块。
+
+定义知乎搜索、问题、回答、文章等核心数据结构。
+所有模型使用 Pydantic 实现，支持数据验证和序列化。
+"""
+
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field
 
 
 class SearchType(str, Enum):
+    """搜索类型枚举。"""
+
     ALL = "all"
     QUESTION = "question"
     ANSWER = "answer"
@@ -12,6 +21,8 @@ class SearchType(str, Enum):
 
 
 class SearchResult(BaseModel):
+    """搜索结果模型。"""
+
     id: str
     type: str = Field(description="内容类型: answer, article, question, people")
     title: str
@@ -24,6 +35,8 @@ class SearchResult(BaseModel):
 
 
 class Answer(BaseModel):
+    """回答模型。"""
+
     id: int
     question_id: int
     question_title: str = ""
@@ -38,6 +51,8 @@ class Answer(BaseModel):
 
 
 class Question(BaseModel):
+    """问题模型。"""
+
     id: int
     title: str
     detail: str = ""
@@ -48,6 +63,8 @@ class Question(BaseModel):
 
 
 class Article(BaseModel):
+    """文章模型。"""
+
     id: str
     title: str
     content: str = ""
@@ -61,6 +78,8 @@ class Article(BaseModel):
 
 
 class SearchResponse(BaseModel):
+    """搜索响应模型，包含分页信息。"""
+
     query: str
     results: list[SearchResult] = []
     total: int = 0

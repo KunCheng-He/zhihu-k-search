@@ -1,3 +1,9 @@
+"""
+登录辅助模块。
+
+提供交互式登录和认证状态检查功能。
+"""
+
 import asyncio
 from pathlib import Path
 from playwright.async_api import Browser, BrowserContext, Page
